@@ -81,9 +81,12 @@ print(classification_report(ytrain, y_pred_train))
 print("\nTest Classification Report:")
 print(classification_report(ytest, y_pred_test))
 
-# Save model
+# Save model in deployment folder (ensure folder exists)
+deployment_folder = os.path.join(BASE_DIR, "deployment")
+os.makedirs(deployment_folder, exist_ok=True)
+
 model_filename = "best_machine_failure_model_v1.joblib"
-joblib.dump(best_model, model_filename)
+model_path = os.path.join(deployment_folder, model_filename)
 
 # Upload to Hugging Face Hub
 repo_id = "Fitjv/machine_failure_model"
