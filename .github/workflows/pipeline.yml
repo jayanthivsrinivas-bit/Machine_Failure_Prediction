@@ -48,7 +48,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: processed-data
-          path: data
+          path: week_2_mls/data
       - name: Model Building
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
