@@ -18,8 +18,12 @@ except RepositoryNotFoundError:
     create_repo(repo_id=repo_id, repo_type=repo_type, private=False)
     print(f"Space '{repo_id}' created.")
 
+from pathlib import Path
+
+folder_path = Path(__file__).parent.parent / "data"
+
 api.upload_folder(
-    folder_path="week_2_mls/data",
+    folder_path=str(folder_path),
     repo_id=repo_id,
     repo_type=repo_type,
 )

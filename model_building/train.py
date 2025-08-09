@@ -1,34 +1,34 @@
 # for data manipulation
+# week_2_mls/model_building/train.py
 import pandas as pd
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import make_column_transformer
 from sklearn.pipeline import make_pipeline
-# for model training, tuning, and evaluation
 import xgboost as xgb
 from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import accuracy_score, classification_report, recall_score
-# for model serialization
+from sklearn.metrics import classification_report
 import joblib
-# for creating a folder
 import os
-# for hugging face space authentication to upload files
-from huggingface_hub import login, HfApi, create_repo
-from huggingface_hub.utils import RepositoryNotFoundError, HfHubHTTPError
+from huggingface_hub import HfApi, create_repo
+from huggingface_hub.utils import RepositoryNotFoundError
 
-api = HfApi()
+# Base directory to locate data folder regardless of where script runs
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
 
-Xtrain_path = "hf://datasets/Fitjv/Machine-Failure-Prediction/Xtrain.csv"
-Xtest_path = "hf://datasets/Fitjv/Machine-Failure-Prediction/Xtest.csv"
-ytrain_path = "hf://datasets/Fitjv/Machine-Failure-Prediction/ytrain.csv"
-ytest_path = "hf://datasets/Fitjv/Machine-Failure-Prediction/ytest.csv"
+# Local paths for training data
+Xtrain_path = os.path.join(DATA_DIR, "Xtrain.csv")
+Xtest_path = os.path.join(DATA_DIR, "Xtest.csv")
+ytrain_path = os.path.join(DATA_DIR, "ytrain.csv")
+ytest_path = os.path.join(DATA_DIR, "ytest.csv")
 
+# Load data
 Xtrain = pd.read_csv(Xtrain_path)
 Xtest = pd.read_csv(Xtest_path)
 ytrain = pd.read_csv(ytrain_path)
 ytest = pd.read_csv(ytest_path)
 
-
-# One-hot encode 'Type' and scale numeric features
+# Feature definitions
 numeric_features = [
     'Air temperature',
     'Process temperature',
@@ -38,20 +38,19 @@ numeric_features = [
 ]
 categorical_features = ['Type']
 
-
-# Class weight to handle imbalance
+# Handle imbalance
 class_weight = ytrain.value_counts()[0] / ytrain.value_counts()[1]
 
-# Preprocessing pipeline
+# Preprocessing
 preprocessor = make_column_transformer(
     (StandardScaler(), numeric_features),
     (OneHotEncoder(handle_unknown='ignore'), categorical_features)
 )
 
-# Define XGBoost model
+# Model
 xgb_model = xgb.XGBClassifier(scale_pos_weight=class_weight, random_state=42)
 
-# Define hyperparameter grid
+# Hyperparameter grid
 param_grid = {
     'xgbclassifier__n_estimators': [50, 75, 100],
     'xgbclassifier__max_depth': [2, 3, 4],
@@ -61,10 +60,10 @@ param_grid = {
     'xgbclassifier__reg_lambda': [0.4, 0.5, 0.6],
 }
 
-# Create pipeline
+# Pipeline
 model_pipeline = make_pipeline(preprocessor, xgb_model)
 
-# Grid search with cross-validation
+# Grid Search
 grid_search = GridSearchCV(model_pipeline, param_grid, cv=5, scoring='recall', n_jobs=-1)
 grid_search.fit(Xtrain, ytrain)
 
@@ -72,29 +71,25 @@ grid_search.fit(Xtrain, ytrain)
 best_model = grid_search.best_estimator_
 print("Best Params:\n", grid_search.best_params_)
 
-# Predict on training set
+# Predictions
 y_pred_train = best_model.predict(Xtrain)
-
-# Predict on test set
 y_pred_test = best_model.predict(Xtest)
 
-# Evaluation
+# Reports
 print("\nTraining Classification Report:")
 print(classification_report(ytrain, y_pred_train))
-
 print("\nTest Classification Report:")
 print(classification_report(ytest, y_pred_test))
 
-# Save best model
-joblib.dump(best_model, "best_machine_failure_model_v1.joblib")
+# Save model
+model_filename = "best_machine_failure_model_v1.joblib"
+joblib.dump(best_model, model_filename)
 
-# Upload to Hugging Face
+# Upload to Hugging Face Hub
 repo_id = "Fitjv/machine_failure_model"
 repo_type = "model"
-
 api = HfApi(token=os.getenv("HF_TOKEN"))
 
-# Step 1: Check if the space exists
 try:
     api.repo_info(repo_id=repo_id, repo_type=repo_type)
     print(f"Model Space '{repo_id}' already exists. Using it.")
@@ -103,10 +98,9 @@ except RepositoryNotFoundError:
     create_repo(repo_id=repo_id, repo_type=repo_type, private=False)
     print(f"Model Space '{repo_id}' created.")
 
-# create_repo("best_machine_failure_model", repo_type="model", private=False)
 api.upload_file(
-    path_or_fileobj="best_machine_failure_model_v1.joblib",
-    path_in_repo="best_machine_failure_model_v1.joblib",
+    path_or_fileobj=model_filename,
+    path_in_repo=model_filename,
     repo_id=repo_id,
     repo_type=repo_type,
 )
