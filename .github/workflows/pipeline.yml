@@ -27,6 +27,15 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: python model_building/prep.py
+      - name: Upload processed data as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: processed-data
+          path: |
+            Xtrain.csv
+            Xtest.csv
+            ytrain.csv
+            ytest.csv
 
   model-traning:
     needs: data-prep
@@ -35,6 +44,11 @@ jobs:
       - uses: actions/checkout@v3
       - name: Install Dependencies
         run: pip install -r requirements.txt
+      - name: Download processed data artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: processed-data
+          path: data
       - name: Model Building
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
